@@ -352,10 +352,11 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
   // ── Layer 6: Presentation ───────────────────────────────────────────
   const l6 = buildLayer6(config, l7.bytes);
   const l6Hex = bytesToHexCompact(l6.bytes);
+  const l7Preview = l7.human.length <= 500 ? l7.human : l7.human.slice(0, 500) + `\n… (${l7.human.length - 500} more characters)`;
   const l6Readable =
     config.protocol === "https"
-      ? `TLS Record | Type: Application Data (23) | Version: TLS 1.2 | Length: ${l6.bytes.length} bytes\n[Encrypted payload: ${l7.bytes.length} bytes]`
-      : `Presentation data | Content-Type: text/plain; charset=UTF-8 | Encoding: identity\n[Payload: ${l6.bytes.length} bytes unchanged]`;
+      ? `TLS Record | Type: Application Data (23) | Version: TLS 1.2 | Length: ${l6.bytes.length} bytes\nPayload (application data, ${l7.bytes.length} bytes):\n---\n${l7Preview}\n---`
+      : `Presentation data | Content-Type: text/plain; charset=UTF-8 | Encoding: identity\nPayload (${l6.bytes.length} bytes):\n---\n${l7Preview}\n---`;
   result.push({
     layerNumber: 6,
     layerName: "Presentation",
@@ -378,10 +379,21 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
     hardware: LAYER_HARDWARE[6],
   });
 
+  // Shared preview of application data for human-readable payload display (all lower layers)
+  const maxPayloadPreview = 600;
+  const msgPreviewShort =
+    l7.human.length <= maxPayloadPreview
+      ? l7.human
+      : l7.human.slice(0, maxPayloadPreview) + `\n… (${l7.human.length - maxPayloadPreview} more characters)`;
+
   // ── Layer 5: Session ────────────────────────────────────────────────
   const l5 = buildLayer5(l6.bytes);
   const l5Hex = bytesToHexCompact(l5.bytes);
-  const l5Readable = `Session PDU | Session ID: 0x1a2b3c4d (4 bytes)\n[Data from presentation: ${l6.bytes.length} bytes] → Total: ${l5.bytes.length} bytes`;
+  const l5Readable =
+    `Session PDU | Session ID: 0x1a2b3c4d (4 bytes)\n` +
+    `Payload from presentation (${l6.bytes.length} bytes):\n` +
+    `---\n${msgPreviewShort}\n---\n` +
+    `Total: ${l5.bytes.length} bytes`;
   result.push({
     layerNumber: 5,
     layerName: "Session",
@@ -395,7 +407,7 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
     humanReadable: l5Readable,
     inputHexFull: l6Hex,
     inputBinary: bytesToBinaryFormatted(l6.bytes),
-    inputHumanReadable: l6Readable,
+    inputHumanReadable: msgPreviewShort,
     outputBinary: bytesToBinaryFormatted(l5.bytes),
     layerDescription: LAYER_DESCRIPTIONS[5],
     protocols: LAYER_PROTOCOLS[5],
@@ -407,7 +419,9 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
   const l4Hex = bytesToHexCompact(l4.bytes);
   const srcPort = l4.fields.find((f) => f.name === "Source Port")?.value ?? "—";
   const dstPort = l4.fields.find((f) => f.name === "Dest Port")?.value ?? "—";
-  const l4Readable = `TCP Segment (20-byte header)\n  Src Port: ${srcPort} → Dst Port: ${dstPort}\n  Seq: 1000 | Ack: 0 | Flags: PSH, ACK | Window: 65535\n  [Payload: ${l5.bytes.length} bytes] → Total: ${l4.bytes.length} bytes`;
+  const l4Readable =
+    `TCP Segment (20-byte header)\n  Src Port: ${srcPort} → Dst Port: ${dstPort}\n  Seq: 1000 | Ack: 0 | Flags: PSH, ACK | Window: 65535\n` +
+    `  Payload (${l5.bytes.length} bytes):\n---\n${msgPreviewShort}\n---\n  Total: ${l4.bytes.length} bytes`;
   result.push({
     layerNumber: 4,
     layerName: "Transport",
@@ -433,7 +447,9 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
   const l3Hex = bytesToHexCompact(l3.bytes);
   const srcIP = l3.fields.find((f) => f.name === "Source IP")?.value ?? "—";
   const dstIP = l3.fields.find((f) => f.name === "Dest IP")?.value ?? "—";
-  const l3Readable = `IP Packet (IPv4, 20-byte header)\n  ${srcIP}  →  ${dstIP}\n  TTL: 64 | Protocol: TCP (6) | Total length: ${l3.bytes.length} bytes`;
+  const l3Readable =
+    `IP Packet (IPv4, 20-byte header)\n  ${srcIP}  →  ${dstIP}\n  TTL: 64 | Protocol: TCP (6)\n` +
+    `  Payload (${l4.bytes.length} bytes):\n---\n${msgPreviewShort}\n---\n  Total length: ${l3.bytes.length} bytes`;
   result.push({
     layerNumber: 3,
     layerName: "Network",
@@ -459,7 +475,9 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
   const l2Hex = bytesToHexCompact(l2.bytes);
   const dstMAC = l2.fields.find((f) => f.name === "Dest MAC")?.value ?? "—";
   const srcMAC = l2.fields.find((f) => f.name === "Src MAC")?.value ?? "—";
-  const l2Readable = `Ethernet II Frame (14-byte header + 4-byte FCS)\n  Dst MAC: ${dstMAC}\n  Src MAC: ${srcMAC}\n  Type: 0x0800 (IPv4) | Payload: ${l3.bytes.length} bytes → Total: ${l2.bytes.length} bytes`;
+  const l2Readable =
+    `Ethernet II Frame (14-byte header + 4-byte FCS)\n  Dst MAC: ${dstMAC}\n  Src MAC: ${srcMAC}\n  Type: 0x0800 (IPv4)\n` +
+    `  Payload (${l3.bytes.length} bytes):\n---\n${msgPreviewShort}\n---\n  Total: ${l2.bytes.length} bytes`;
   result.push({
     layerNumber: 2,
     layerName: "Data Link",
@@ -482,7 +500,9 @@ export function buildEncapsulation(config: OSISimulationConfig): LayerEncapsulat
 
   // ── Layer 1: Physical ───────────────────────────────────────────────
   const l1 = buildLayer1(l2.bytes);
-  const l1Readable = `Physical layer: ${l2.bytes.length} bytes × 8 = ${l2.bytes.length * 8} bits on the wire\nFirst 8 bytes as bits:\n${l1.bitsPreview}`;
+  const l1Readable =
+    `Physical layer: ${l2.bytes.length} bytes × 8 = ${l2.bytes.length * 8} bits on the wire\n` +
+    `Carrying application data:\n---\n${msgPreviewShort}\n---\nFirst 8 bytes as bits:\n${l1.bitsPreview}`;
   result.push({
     layerNumber: 1,
     layerName: "Physical",

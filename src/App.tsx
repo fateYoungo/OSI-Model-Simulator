@@ -31,6 +31,10 @@ function App() {
     return localStorage.getItem(LEGACY_BANNER_STORAGE_KEY) !== "true";
   });
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("open-osi-intro"));
+  }, []);
+
   const closeBanner = useCallback(() => {
     localStorage.setItem(LEGACY_BANNER_STORAGE_KEY, "true");
     setBannerVisible(false);

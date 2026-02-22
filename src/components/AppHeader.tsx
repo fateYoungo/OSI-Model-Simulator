@@ -4,6 +4,7 @@ import { useTheme, type ThemeName } from "../contexts/ThemeContext";
 import StoryModal from "../components/StoryModal";
 import AboutModal from "../components/AboutModal";
 import LicenseModal from "../components/LicenseModal";
+import OSIIntroModal from "../components/OSIIntroModal";
 import {
   Palette,
   Menu,
@@ -97,6 +98,13 @@ export default function AppHeader() {
   const [storyModalOpen, setStoryModalOpen] = useState(false);
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [licenseModalOpen, setLicenseModalOpen] = useState(false);
+  const [osiIntroOpen, setOsiIntroOpen] = useState(false);
+
+  useEffect(() => {
+    const openOsiIntro = () => setOsiIntroOpen(true);
+    window.addEventListener("open-osi-intro" as any, openOsiIntro);
+    return () => window.removeEventListener("open-osi-intro" as any, openOsiIntro);
+  }, []);
   const [menuButtons, setMenuButtons] = useState<string[]>([]);
 
   const headerRef = useRef<HTMLElement>(null);
@@ -595,6 +603,21 @@ export default function AppHeader() {
                   </DropdownMenuItem>
                 </motion.div>
                 <motion.div
+                  key="osi-intro"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, delay: 0.01 }}
+                >
+                  <DropdownMenuItem
+                    className="flex items-center gap-3 cursor-pointer"
+                    onClick={() => setOsiIntroOpen(true)}
+                  >
+                    <Layers className="w-4 h-4" />
+                    <span>What is the OSI model?</span>
+                  </DropdownMenuItem>
+                </motion.div>
+                <motion.div
                   key="legacy"
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -722,6 +745,7 @@ export default function AppHeader() {
       </motion.header>
 
       <StoryModal isOpen={storyModalOpen} onClose={() => setStoryModalOpen(false)} />
+      <OSIIntroModal isOpen={osiIntroOpen} onClose={() => setOsiIntroOpen(false)} />
       <AboutModal isOpen={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
       <LicenseModal isOpen={licenseModalOpen} onClose={() => setLicenseModalOpen(false)} />
     </>

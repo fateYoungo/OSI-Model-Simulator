@@ -52,10 +52,17 @@ const SCROLL_DURATION_MAX_MS: Record<string, number> = {
 /** Pixels to scroll per Up/Down arrow key press */
 const KEYBOARD_SCROLL_STEP_PX = 100;
 
-const HANDSHAKE_STEPS = [
-  { label: "SYN", desc: "Client sends SYN (synchronize) to initiate the connection.", direction: "client-to-server" as const },
-  { label: "SYN-ACK", desc: "Server responds with SYN-ACK (synchronize-acknowledge).", direction: "server-to-client" as const },
-  { label: "ACK", desc: "Client sends ACK (acknowledge). Connection established.", direction: "client-to-server" as const },
+type HandshakeStepItem = {
+  label: string;
+  seq: number;
+  ack: number;
+  desc: string;
+  direction: "client-to-server" | "server-to-client";
+};
+const HANDSHAKE_STEPS: HandshakeStepItem[] = [
+  { label: "SYN", seq: 1000, ack: 0, desc: "Client sends SYN (synchronize) to initiate the connection. Seq=1000, Ack=0.", direction: "client-to-server" },
+  { label: "SYN-ACK", seq: 2000, ack: 1001, desc: "Server responds with SYN-ACK (synchronize-acknowledge). Seq=2000, Ack=1001.", direction: "server-to-client" },
+  { label: "ACK", seq: 1001, ack: 2001, desc: "Client sends ACK (acknowledge). Seq=1001, Ack=2001. Connection established.", direction: "client-to-server" },
 ];
 
 const REALTIME_STEPS = [
@@ -311,7 +318,11 @@ export default function OSIVisualization() {
                 animate={{ opacity: 1 }}
                 className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-lg"
               >
-                Connection setup: {HANDSHAKE_STEPS[handshakeStep - 1]?.label ?? "—"}
+                Connection setup: {(() => {
+                const s = HANDSHAKE_STEPS[handshakeStep - 1];
+                if (!s) return "—";
+                return s.ack === 0 ? `${s.label} (Seq=${s.seq})` : `${s.label} (Seq=${s.seq}, Ack=${s.ack})`;
+              })()}
               </motion.span>
             )}
             {isReceiving && currentStep >= 1 && currentStep <= 7 && layerData && (
@@ -590,7 +601,11 @@ export default function OSIVisualization() {
                           <motion.button
                             key={`recv-${layer.number}`}
                             type="button"
-                            onClick={() => canClick && goToStep(step, "receiving")}
+                            onClick={() => {
+                              if (!canClick) return;
+                              setShowDirectConnectionInfo(false);
+                              goToStep(step, "receiving");
+                            }}
                             disabled={!canClick}
                             layout
                             animate={{
@@ -825,13 +840,16 @@ export default function OSIVisualization() {
                                 animate={isActive ? { scale: [1, 1.05, 1] } : {}}
                                 transition={{ duration: 1.2, repeat: isActive ? Infinity : 0 }}
                                 className={cn(
-                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold",
+                                  "inline-flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-lg text-xs font-semibold",
                                   isActive && "bg-primary text-primary-foreground shadow-md",
                                   isPast && "bg-muted text-foreground border border-border",
                                   !isActive && !isPast && "bg-muted text-muted-foreground"
                                 )}
                               >
-                                {step.label}
+                                <span>{step.label}</span>
+                                <span className={cn("font-normal opacity-90", "text-[10px]")}>
+                                  {step.ack === 0 ? `Seq=${step.seq}` : `Seq=${step.seq} Ack=${step.ack}`}
+                                </span>
                               </motion.span>
                             ) : (
                               <span className="w-16" />
@@ -871,13 +889,16 @@ export default function OSIVisualization() {
                                 animate={isActive ? { scale: [1, 1.05, 1] } : {}}
                                 transition={{ duration: 1.2, repeat: isActive ? Infinity : 0 }}
                                 className={cn(
-                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold",
+                                  "inline-flex flex-col items-start gap-0.5 px-3 py-1.5 rounded-lg text-xs font-semibold",
                                   isActive && "bg-primary text-primary-foreground shadow-md",
                                   isPast && "bg-muted text-foreground border border-border",
                                   !isActive && !isPast && "bg-muted text-muted-foreground"
                                 )}
                               >
-                                {step.label}
+                                <span>{step.label}</span>
+                                <span className={cn("font-normal opacity-90", "text-[10px]")}>
+                                  Seq={step.seq} Ack={step.ack}
+                                </span>
                               </motion.span>
                             ) : (
                               <span className="w-16" />
